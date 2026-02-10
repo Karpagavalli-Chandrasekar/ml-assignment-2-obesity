@@ -326,13 +326,15 @@ elif model_name == "XGBoost (optional)":
         st.stop()
 
     model = XGBClassifier(
-        n_estimators=300,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.9,
-        colsample_bytree=0.9,
+        n_estimators=100,      # reduced from 300
+        max_depth=4,           # reduced depth
+        learning_rate=0.1,     # slightly higher learning rate
+        subsample=0.8,
+        colsample_bytree=0.8,
         eval_metric="logloss",
-        random_state=random_state
+        random_state=random_state,
+        n_jobs=-1
+
     )
 else:
     st.error("Unknown model selection")
