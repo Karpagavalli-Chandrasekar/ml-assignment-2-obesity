@@ -507,7 +507,7 @@ st.table(
 )
 
 # ---------------- Auto Generate README Table ----------------
-card("Auto-Generate README Table", "Creates markdown table for all models.", "card-green")
+card("Models performance comparison table", "card-green")
 
 results_df, readme_md = generate_readme_table(X, y, test_size, random_state)
 
