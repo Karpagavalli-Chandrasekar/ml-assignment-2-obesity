@@ -11,6 +11,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score, matthews_corrcoef
 
 # XGBoost (optional)
 try:
@@ -24,12 +25,12 @@ except Exception:
 st.set_page_config(page_title="Obesity ML Assignment", layout="wide")
 
 
-# ---------------- Theme / Styling (FINAL CLEAN VERSION) ----------------
+# ---------------- Theme / Styling ----------------
 def apply_theme():
     st.markdown(
         """
         <style>
-        /* ================= MAIN APP BACKGROUND (MATCH SIDEBAR - VIRIDIAN) ================= */
+        /* ================= MAIN APP BACKGROUND ================= */
         .stApp {
             background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%) !important;
         }
@@ -42,7 +43,7 @@ def apply_theme():
             padding-right: 2.2rem;
         }
 
-        /* ================= TOP HEADER / TOOLBAR FIX ================= */
+        /* ================= TOP HEADER / TOOLBAR  ================= */
         header[data-testid="stHeader"] {
             background: linear-gradient(180deg, #1f3f36 0%, #16332c 100%) !important;
         }
@@ -221,7 +222,7 @@ st.markdown(
 
 
 # ---------------- Sidebar ----------------
-st.sidebar.markdown("## 🎛️ Controls")
+st.sidebar.markdown("## Controls")
 st.sidebar.caption("Pick a model, set split/threshold, and run the evaluation.")
 
 st.sidebar.header("Model Selection")
@@ -279,6 +280,7 @@ target_map = {
 }
 
 y = df[target_col].map(target_map)
+y = y.fillna(0)
 
 # ---------------- Distributions ----------------
 if show_distributions:
@@ -289,6 +291,12 @@ if show_distributions:
 
 
 # ---------------- Features ----------------
+binary_cols = ["family_history_with_overweight", "FAVC", "SMOKE", "SCC"]
+for col in binary_cols:
+    if col in df.columns:
+        df[col] = df[col].astype(str).str.lower().map({"yes":1, "no":0})
+        df[col] = df[col].fillna(0)
+
 X = pd.get_dummies(df.drop(columns=[target_col]), drop_first=True)
 
 
@@ -343,8 +351,10 @@ else:
 model.fit(X_train, y_train)
 
 # ---------------- Predict ----------------
+y_prob = None
 if hasattr(model, "predict_proba"):
-    y_pred = (model.predict_proba(X_test)[:, 1] >= threshold).astype(int)
+    y_prob = model.predict_proba(X_test)[:, 1]
+    y_pred = (y_prob >= threshold).astype(int)
 else:
     y_pred = model.predict(X_test)
 
@@ -354,6 +364,15 @@ card("Model Performance", "Evaluation metrics.", "card-purple")
 
 acc = accuracy_score(y_test, y_pred)
 st.metric("Overall Accuracy", round(acc, 4))
+
+col1, col2 = st.columns(2)
+
+if y_prob is not None:
+    auc = roc_auc_score(y_test, y_prob)
+    col1.metric("AUC Score", round(auc, 4))
+
+mcc = matthews_corrcoef(y_test, y_pred)
+col2.metric("MCC", round(mcc, 4))
 
 report = classification_report(y_test, y_pred, output_dict=True)
 
