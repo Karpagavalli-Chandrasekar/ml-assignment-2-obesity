@@ -198,6 +198,12 @@ def apply_theme():
         div[data-testid="stDataFrame"] * {
             justify-content: flex-start !important;
         }
+
+        div.stDownloadButton > button {
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+
         </style>
         """,
         unsafe_allow_html=True
