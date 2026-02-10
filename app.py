@@ -511,15 +511,5 @@ card("Auto-Generate README Table", "Creates markdown table for all models.", "ca
 
 results_df, readme_md = generate_readme_table(X, y, test_size, random_state)
 
-st.dataframe(results_df.round(4), use_container_width=True)
-
-st.markdown("### Copy this into README.md")
-st.code(readme_md, language="markdown")
-
-st.download_button(
-    label="Download Markdown Table",
-    data=readme_md.encode("utf-8"),
-    file_name="model_comparison_table.md",
-    mime="text/markdown"
-)
+st.table(results_df.round(4))
 
