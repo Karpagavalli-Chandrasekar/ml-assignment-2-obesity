@@ -263,11 +263,18 @@ target_col = "NObeyesdad"
 
 
 # ---------------- Preview ----------------
+
 if show_data:
     card("Dataset Preview", "First few rows of the dataset.", "card-blue")
-    st.dataframe(df.head(), use_container_width=True)
+    st.dataframe(df.head(10), use_container_width=True)  # show 10 rows (you can change)
 
-
+    csv_data = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="⬇️ Download Full Dataset (CSV)",
+        data=csv_data,
+        file_name="ObesityDataSet.csv",
+        mime="text/csv"
+    )
 # ---------------- Target mapping ----------------
 target_map = {
     "Insufficient_Weight": 0,
