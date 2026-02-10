@@ -12,6 +12,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 
+# XGBoost (optional)
+try:
+    from xgboost import XGBClassifier
+    XGB_AVAILABLE = True
+except Exception:
+    XGB_AVAILABLE = False
+
 
 # ---------------- Page Config ----------------
 st.set_page_config(page_title="Obesity ML Assignment", layout="wide")
@@ -313,8 +320,22 @@ elif model_name == "Naive Bayes (GaussianNB)":
     model = GaussianNB()
 elif model_name == "Random Forest":
     model = RandomForestClassifier(random_state=random_state, n_jobs=-1)
+elif model_name == "XGBoost (optional)":
+    if not XGB_AVAILABLE:
+        st.error("XGBoost is not available in this environment. Please check requirements.txt and redeploy.")
+        st.stop()
+
+    model = XGBClassifier(
+        n_estimators=300,
+        max_depth=5,
+        learning_rate=0.05,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        eval_metric="logloss",
+        random_state=random_state
+    )
 else:
-    st.error("XGBoost not installed")
+    st.error("Unknown model selection")
     st.stop()
 
 model.fit(X_train, y_train)
