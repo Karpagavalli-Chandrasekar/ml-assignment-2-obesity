@@ -496,9 +496,11 @@ st.table(
     )
 )
 
-# ---------------- Auto Generate README Table ----------------
-card("Models performance comparison table", "All-model summary (Accuracy, AUC, MCC, Precision, Recall, F1).")
-results_df, readme_md = generate_readme_table(X, y, test_size, random_state)
+# ---------------- Models performance comparison table ----------------
 
+st.subheader("Models performance Comparison")
+
+results_df = generate_readme_table(X_train, X_test, y_train, y_test, random_state)
 st.table(results_df.round(4))
+
 
