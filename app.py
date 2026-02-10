@@ -329,19 +329,19 @@ if not run_btn:
     card("Ready to Run", "Choose options on the left and click Run.", "card-green")
     st.stop()
 
-def generate_readme_table(X, y, test_size, random_state):
-    from sklearn.pipeline import Pipeline
+def generate_readme_table(X_train_df, X_test_df, y_train, y_test, random_state):
+    """
+    Uses the SAME train/test split as the selected model section.
+    Applies scaling ONLY for LR and KNN inside this function (does NOT touch your main scaling logic).
+    Uses threshold=0.50 for fair comparison across models.
+    """
+    rows = []
 
+    # Define models (no pipelines needed; we scale manually only when required)
     models = {
-        "Logistic Regression": Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", LogisticRegression(max_iter=2000))
-        ]),
+        "Logistic Regression": LogisticRegression(max_iter=2000),
         "Decision Tree": DecisionTreeClassifier(random_state=random_state),
-        "KNN": Pipeline([
-            ("scaler", StandardScaler()),
-            ("model", KNeighborsClassifier())
-        ]),
+        "KNN": KNeighborsClassifier(),
         "Naive Bayes": GaussianNB(),
         "Random Forest": RandomForestClassifier(random_state=random_state, n_jobs=-1),
     }
@@ -358,19 +358,22 @@ def generate_readme_table(X, y, test_size, random_state):
             n_jobs=-1
         )
 
-    # Train/Test Split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=y
-    )
-
-    rows = []
-
     for name, model in models.items():
+        # Apply scaling only for LR and KNN
+        if name in ["Logistic Regression", "KNN"]:
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train_df)
+            X_test = scaler.transform(X_test_df)
+        else:
+            X_train = X_train_df
+            X_test = X_test_df
+
         model.fit(X_train, y_train)
 
+        # Probabilities (for AUC + threshold)
         if hasattr(model, "predict_proba"):
             y_prob = model.predict_proba(X_test)[:, 1]
-            y_pred = (y_prob >= 0.50).astype(int)
+            y_pred = (y_prob >= 0.50).astype(int)   # fixed threshold for fair comparison
             auc = roc_auc_score(y_test, y_prob)
         else:
             y_pred = model.predict(X_test)
@@ -379,7 +382,7 @@ def generate_readme_table(X, y, test_size, random_state):
         acc = accuracy_score(y_test, y_pred)
         mcc = matthews_corrcoef(y_test, y_pred)
 
-        report = classification_report(y_test, y_pred, output_dict=True)
+        report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
         precision = report["weighted avg"]["precision"]
         recall = report["weighted avg"]["recall"]
         f1 = report["weighted avg"]["f1-score"]
@@ -387,26 +390,13 @@ def generate_readme_table(X, y, test_size, random_state):
         rows.append([name, acc, auc, mcc, precision, recall, f1])
 
     df_results = pd.DataFrame(rows, columns=[
-        "Model", "Accuracy", "AUC", "MCC",
-        "Precision", "Recall", "F1"
+        "Model", "Accuracy", "AUC", "MCC", "Precision", "Recall", "F1"
     ])
 
-    # Format Markdown Table
-    md = "| Model | Accuracy | AUC | MCC | Precision | Recall | F1 |\n"
-    md += "|---|---:|---:|---:|---:|---:|---:|\n"
+    # Sort best first (optional)
+    df_results = df_results.sort_values(by=["Accuracy", "AUC", "MCC"], ascending=False).reset_index(drop=True)
 
-    for _, row in df_results.iterrows():
-        md += (
-            f"| {row['Model']} | "
-            f"{row['Accuracy']:.4f} | "
-            f"{row['AUC']:.4f} | "
-            f"{row['MCC']:.4f} | "
-            f"{row['Precision']:.4f} | "
-            f"{row['Recall']:.4f} | "
-            f"{row['F1']:.4f} |\n"
-        )
-
-    return df_results, md
+    return df_results
 
 
 # ---------------- Train/Test ----------------
@@ -507,7 +497,7 @@ st.table(
 )
 
 # ---------------- Auto Generate README Table ----------------
-card("Models performance comparison table", "card-green")
+card("Models performance comparison table")
 
 results_df, readme_md = generate_readme_table(X, y, test_size, random_state)
 
