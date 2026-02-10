@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -328,6 +329,85 @@ if not run_btn:
     card("Ready to Run", "Choose options on the left and click Run.", "card-green")
     st.stop()
 
+def generate_readme_table(X, y, test_size, random_state):
+    from sklearn.pipeline import Pipeline
+
+    models = {
+        "Logistic Regression": Pipeline([
+            ("scaler", StandardScaler()),
+            ("model", LogisticRegression(max_iter=2000))
+        ]),
+        "Decision Tree": DecisionTreeClassifier(random_state=random_state),
+        "KNN": Pipeline([
+            ("scaler", StandardScaler()),
+            ("model", KNeighborsClassifier())
+        ]),
+        "Naive Bayes": GaussianNB(),
+        "Random Forest": RandomForestClassifier(random_state=random_state, n_jobs=-1),
+    }
+
+    if XGB_AVAILABLE:
+        models["XGBoost"] = XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            eval_metric="logloss",
+            random_state=random_state,
+            n_jobs=-1
+        )
+
+    # Train/Test Split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state, stratify=y
+    )
+
+    rows = []
+
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+
+        if hasattr(model, "predict_proba"):
+            y_prob = model.predict_proba(X_test)[:, 1]
+            y_pred = (y_prob >= 0.50).astype(int)
+            auc = roc_auc_score(y_test, y_prob)
+        else:
+            y_pred = model.predict(X_test)
+            auc = np.nan
+
+        acc = accuracy_score(y_test, y_pred)
+        mcc = matthews_corrcoef(y_test, y_pred)
+
+        report = classification_report(y_test, y_pred, output_dict=True)
+        precision = report["weighted avg"]["precision"]
+        recall = report["weighted avg"]["recall"]
+        f1 = report["weighted avg"]["f1-score"]
+
+        rows.append([name, acc, auc, mcc, precision, recall, f1])
+
+    df_results = pd.DataFrame(rows, columns=[
+        "Model", "Accuracy", "AUC", "MCC",
+        "Precision", "Recall", "F1"
+    ])
+
+    # Format Markdown Table
+    md = "| Model | Accuracy | AUC | MCC | Precision | Recall | F1 |\n"
+    md += "|---|---:|---:|---:|---:|---:|---:|\n"
+
+    for _, row in df_results.iterrows():
+        md += (
+            f"| {row['Model']} | "
+            f"{row['Accuracy']:.4f} | "
+            f"{row['AUC']:.4f} | "
+            f"{row['MCC']:.4f} | "
+            f"{row['Precision']:.4f} | "
+            f"{row['Recall']:.4f} | "
+            f"{row['F1']:.4f} |\n"
+        )
+
+    return df_results, md
+
 
 # ---------------- Train/Test ----------------
 X_train, X_test, y_train, y_test = train_test_split(
@@ -400,6 +480,10 @@ col2.metric("MCC", round(mcc, 4))
 
 report = classification_report(y_test, y_pred, output_dict=True)
 
+precision = report["weighted avg"]["precision"]
+recall = report["weighted avg"]["recall"]
+f1 = report["weighted avg"]["f1-score"]
+
 # Convert report to DataFrame
 report_df = pd.DataFrame(report).T.round(4)
 
@@ -421,3 +505,21 @@ st.table(
         columns=["Pred 0", "Pred 1"]
     )
 )
+
+# ---------------- Auto Generate README Table ----------------
+card("Auto-Generate README Table", "Creates markdown table for all models.", "card-green")
+
+results_df, readme_md = generate_readme_table(X, y, test_size, random_state)
+
+st.dataframe(results_df.round(4), use_container_width=True)
+
+st.markdown("### Copy this into README.md")
+st.code(readme_md, language="markdown")
+
+st.download_button(
+    label="Download Markdown Table",
+    data=readme_md.encode("utf-8"),
+    file_name="model_comparison_table.md",
+    mime="text/markdown"
+)
+
