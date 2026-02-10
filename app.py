@@ -199,10 +199,21 @@ def apply_theme():
             justify-content: flex-start !important;
         }
 
-        div.stDownloadButton > button {
-            color: #000000 !important;
-            font-weight: 700 !important;
-        }
+/* ================= DOWNLOAD BUTTON FIX (FORCE BLACK + BOLD) ================= */
+div.stDownloadButton > button,
+div.stDownloadButton > button * {
+    color: #000000 !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+}
+
+/* Optional: make button background visible and nicer */
+div.stDownloadButton > button {
+    background: #ffffff !important;
+    border: 2px solid rgba(0,0,0,0.35) !important;
+    border-radius: 12px !important;
+}
+
 
         </style>
         """,
