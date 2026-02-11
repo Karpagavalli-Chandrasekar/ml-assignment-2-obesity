@@ -5,7 +5,6 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.metrics import precision_score, recall_score, f1_score
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -31,191 +30,48 @@ def apply_theme():
     st.markdown(
         """
         <style>
-        /* ================= MAIN APP BACKGROUND ================= */
         .stApp {
-            background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%) !important;
+            background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%);
         }
 
-        /* Right-side content spacing */
-        .block-container {
-            padding-top: 1.2rem;
-            padding-bottom: 2rem;
-            padding-left: 2.2rem;
-            padding-right: 2.2rem;
-        }
-
-        /* ================= TOP HEADER / TOOLBAR  ================= */
-        header[data-testid="stHeader"] {
-            background: linear-gradient(180deg, #1f3f36 0%, #16332c 100%) !important;
-        }
-        header[data-testid="stHeader"] * {
-            color: #FFFFFF !important;
-        }
-        header[data-testid="stHeader"]::after {
-            background: none !important;
-        }
-
-        /* ================= SIDEBAR (VIRIDIAN + BLACK TEXT) ================= */
-        section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%) !important;
-            border-right: 1px solid rgba(0,0,0,0.25) !important;
-        }
-
-        /* FORCE ALL SIDEBAR TEXT TO BLACK */
-        section[data-testid="stSidebar"],
-        section[data-testid="stSidebar"] *,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] span,
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] div,
-        section[data-testid="stSidebar"] input,
-        section[data-testid="stSidebar"] textarea {
-            color: #000000 !important;
-        }
-
-        /* Dropdown arrow */
-        section[data-testid="stSidebar"] svg {
-            fill: #000000 !important;
-        }
-
-        /* Sidebar Run button */
-        section[data-testid="stSidebar"] .stButton > button {
-            width: 100%;
-            border-radius: 12px;
-            border: 1px solid rgba(0,0,0,0.4);
-            background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
-            color: #ffffff !important;   /* button text stays white */
-            font-weight: 700;
-            padding: 0.7rem 1rem;
-        }
-
-        /* ================= TITLE ================= */
         .app-title {
             color: #ffffff;
             font-weight: 800;
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.6rem;
         }
 
-        /* ================= CARDS (IMPROVED FOR VIRIDIAN BACKGROUND) ================= */
         .card {
-            background: rgba(15, 23, 42, 0.75);      /* deep slate overlay */
-            border-radius: 18px;
-            padding: 18px;
-            margin: 14px 0;
+            background: rgba(15, 23, 42, 0.75);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 12px 0;
             border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
-        }
-
-        .card h3 {
-            color: #f9fafb;
-            margin-bottom: 8px;
         }
 
         .muted {
             color: rgba(255,255,255,0.85);
             font-size: 0.92rem;
+            margin: 0;
         }
 
-        /* Keep your accent variants (optional; they sit on top of the base card bg if used elsewhere) */
-        .card-blue { background: rgba(37, 99, 235, 0.16); }
-        .card-green { background: rgba(16, 185, 129, 0.16); }
-        .card-purple { background: rgba(124, 58, 237, 0.16); }
-        .card-amber { background: rgba(245, 158, 11, 0.16); }
-        .card-rose { background: rgba(244, 63, 94, 0.14); }
+        /* Optional card accents (since you use card-blue/card-green/etc. in code) */
+        .card-blue   { border-left: 6px solid rgba(37, 99, 235, 0.85); }
+        .card-green  { border-left: 6px solid rgba(16, 185, 129, 0.85); }
+        .card-purple { border-left: 6px solid rgba(124, 58, 237, 0.85); }
+        .card-amber  { border-left: 6px solid rgba(245, 158, 11, 0.85); }
+        .card-rose   { border-left: 6px solid rgba(244, 63, 94, 0.85); }
 
-        /* ================= METRICS ================= */
         div[data-testid="stMetric"] {
-            background: rgba(15, 23, 42, 0.55);
-            border: 1px solid rgba(255,255,255,0.12);
-            padding: 12px;
-            border-radius: 14px;
-            text-align: left !important;
-        }
-
-        div[data-testid="stMetric"] * {
-            color: #ffffff !important;
-            font-weight: 600;
-            text-align: left !important;
-            justify-content: flex-start !important;
-        }
-
-        div[data-testid="stMetricValue"],
-        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-            font-size: 1.35rem;
-            font-weight: 800;
-            text-align: left !important;
-            justify-content: flex-start !important;
-        }
-
-        /* ================= TABLES & DATAFRAMES ================= */
-        [data-testid="stTable"],
-        div[data-testid="stDataFrame"] {
-            background: rgba(15, 23, 42, 0.55);
-            border-radius: 14px;
-            border: 1px solid rgba(255,255,255,0.12);
-        }
-
-        [data-testid="stTable"] th,
-        [data-testid="stTable"] td,
-        div[data-testid="stDataFrame"] * {
-            color: #ffffff !important;
-        }
-
-        /* ================= GENERAL TEXT ================= */
-        div[data-testid="stMarkdownContainer"] *,
-        div[data-testid="stExpander"] * {
-            color: #ffffff !important;
-        }
-
-        pre {
-            color: #ffffff !important;
-            background-color: rgba(15, 23, 42, 0.55) !important;
-            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.60);
+            border-radius: 12px;
             padding: 10px;
-            border: 1px solid rgba(255,255,255,0.12);
         }
 
-        /* ================= FORCE TABLE TEXT LEFT ALIGN ================= */
-
-        /* st.table() */
-        div[data-testid="stTable"] div {
-            text-align: left !important;
-            justify-content: flex-start !important;
+        /* Make card headings readable */
+        .card h3 {
+            color: #ffffff;
+            margin: 0 0 6px 0;
         }
-
-        /* st.dataframe() cells */
-        div[data-testid="stDataFrame"] div[role="gridcell"] {
-            text-align: left !important;
-            justify-content: flex-start !important;
-        }
-
-        /* Headers */
-        div[data-testid="stDataFrame"] div[role="columnheader"] {
-            text-align: left !important;
-            justify-content: flex-start !important;
-        }
-
-        /* Prevent numeric auto-alignment */
-        div[data-testid="stDataFrame"] * {
-            justify-content: flex-start !important;
-        }
-
-/* ================= DOWNLOAD BUTTON FIX (FORCE BLACK + BOLD) ================= */
-div.stDownloadButton > button,
-div.stDownloadButton > button * {
-    color: #000000 !important;
-    font-weight: 800 !important;
-    opacity: 1 !important;
-}
-
-/* Optional: make button background visible and nicer */
-div.stDownloadButton > button {
-    background: #ffffff !important;
-    border: 2px solid rgba(0,0,0,0.35) !important;
-    border-radius: 12px !important;
-}
-
-
         </style>
         """,
         unsafe_allow_html=True
