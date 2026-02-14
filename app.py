@@ -1,9 +1,10 @@
+import os
+import joblib
 import streamlit as st
 import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -12,18 +13,8 @@ from sklearn.metrics import (
     matthews_corrcoef,
 )
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.ensemble import RandomForestClassifier
-
-# XGBoost (optional)
-try:
-    from xgboost import XGBClassifier
-    XGB_AVAILABLE = True
-except Exception:
-    XGB_AVAILABLE = False
+# Use the shared preprocessing (same as training)
+from model.preprocess import prepare_X_y
 
 
 # ---------------- Page Config ----------------
@@ -35,68 +26,28 @@ def apply_theme():
     st.markdown(
         """
         <style>
-        /* --- App background --- */
-        .stApp {
-            background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%);
-        }
+        .stApp { background: linear-gradient(180deg, #40826D 0%, #2F6F5F 100%); }
 
-        /* --- Safer text coloring (DO NOT override all elements) --- */
-        .stApp p,
-        .stApp h1,
-        .stApp h2,
-        .stApp h3,
-        .stApp h4,
-        .stApp h5,
-        .stApp h6,
-        .stApp label,
-        .stMarkdown,
-        .stText,
-        .stCaption {
+        .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+        .stApp label, .stMarkdown, .stText, .stCaption { color: #ffffff !important; }
+
+        section[data-testid="stSidebar"] { background: rgba(15, 23, 42, 0.65) !important; }
+        section[data-testid="stSidebar"] * { color: #ffffff !important; }
+
+        header[data-testid="stHeader"] { background: transparent !important; }
+        header[data-testid="stHeader"] > div { background: transparent !important; }
+        div[data-testid="stToolbar"] { background: transparent !important; }
+
+        header[data-testid="stHeader"] svg,
+        header[data-testid="stHeader"] button,
+        div[data-testid="stToolbar"] svg,
+        div[data-testid="stToolbar"] button {
             color: #ffffff !important;
+            fill: #ffffff !important;
         }
 
-        /* --- Sidebar readable --- */
-        section[data-testid="stSidebar"] {
-            background: rgba(15, 23, 42, 0.65) !important;
-        }
-        section[data-testid="stSidebar"] * {
-            color: #ffffff !important;
-        }
+        .app-title { color: #ffffff !important; font-weight: 800; margin-bottom: 0.6rem; }
 
-        /* --- Fix the top Streamlit header / toolbar (prevents white bar / white square) --- */
-/* Remove default white background */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-}
-
-/* Fix internal header container that causes white square */
-header[data-testid="stHeader"] > div {
-    background: transparent !important;
-}
-
-/* Fix deploy/menu area */
-div[data-testid="stToolbar"] {
-    background: transparent !important;
-}
-
-/* Ensure icons and text are white */
-header[data-testid="stHeader"] svg,
-header[data-testid="stHeader"] button,
-div[data-testid="stToolbar"] svg,
-div[data-testid="stToolbar"] button {
-    color: #ffffff !important;
-    fill: #ffffff !important;
-}
-
-
-        /* --- Titles --- */
-        .app-title {
-            color: #ffffff !important;
-            font-weight: 800;
-            margin-bottom: 0.6rem;
-        }
-
-        /* --- Card UI --- */
         .card {
             background: rgba(15, 23, 42, 0.75);
             border-radius: 15px;
@@ -105,50 +56,38 @@ div[data-testid="stToolbar"] button {
             border: 1px solid rgba(255,255,255,0.15);
         }
 
-        .muted {
-            color: rgba(255,255,255,0.85) !important;
-            font-size: 0.92rem;
-            margin: 0;
-        }
+        .muted { color: rgba(255,255,255,0.85) !important; font-size: 0.92rem; margin: 0; }
 
-        /* Optional card accents */
         .card-blue   { border-left: 6px solid rgba(37, 99, 235, 0.85); }
         .card-green  { border-left: 6px solid rgba(16, 185, 129, 0.85); }
         .card-purple { border-left: 6px solid rgba(124, 58, 237, 0.85); }
         .card-amber  { border-left: 6px solid rgba(245, 158, 11, 0.85); }
         .card-rose   { border-left: 6px solid rgba(244, 63, 94, 0.85); }
 
-        /* --- Metrics block --- */
         div[data-testid="stMetric"] {
             background: rgba(15, 23, 42, 0.60);
             border-radius: 12px;
             padding: 10px;
         }
 
-        /* --- Inputs (selectbox/slider/text) backgrounds --- */
         div[data-baseweb="select"] > div,
         div[data-baseweb="input"] > div,
         div[data-baseweb="textarea"] > div {
             background-color: rgba(15, 23, 42, 0.70) !important;
         }
 
-        /* --- Dropdown / popover menu background + text --- */
         div[role="listbox"] {
             background: rgba(15, 23, 42, 0.95) !important;
             color: #ffffff !important;
         }
-        div[role="option"] {
-            color: #ffffff !important;
-        }
+        div[role="option"] { color: #ffffff !important; }
 
-        /* --- Buttons --- */
         .stButton button {
             background-color: rgba(255,255,255,0.15) !important;
             border: 1px solid rgba(255,255,255,0.25) !important;
             color: #ffffff !important;
         }
 
-        /* --- Download button: white background + BLACK text --- */
         div[data-testid="stDownloadButton"] button {
             background-color: #ffffff !important;
             border: 1px solid #000000 !important;
@@ -161,15 +100,9 @@ div[data-testid="stToolbar"] button {
             color: #000000 !important;
             font-weight: 700 !important;
         }
-        div[data-testid="stDownloadButton"] button svg {
-            fill: #000000 !important;
-        }
+        div[data-testid="stDownloadButton"] button svg { fill: #000000 !important; }
 
-        /* --- Tables --- */
-        .stTable, .stDataFrame {
-            background: rgba(15, 23, 42, 0.55) !important;
-        }
-
+        .stTable, .stDataFrame { background: rgba(15, 23, 42, 0.55) !important; }
         </style>
         """,
         unsafe_allow_html=True
@@ -195,7 +128,7 @@ st.markdown(
 
 # ---------------- Sidebar ----------------
 st.sidebar.markdown("## Controls")
-st.sidebar.caption("Pick a model, set split/threshold, and run the evaluation.")
+st.sidebar.caption("Pick a saved model, set split/threshold, and run evaluation.")
 
 st.sidebar.header("Model Selection")
 model_name = st.sidebar.selectbox(
@@ -206,7 +139,7 @@ model_name = st.sidebar.selectbox(
         "KNN",
         "Naive Bayes (GaussianNB)",
         "Random Forest",
-        "XGBoost (optional)"
+        "XGBoost",
     ]
 )
 
@@ -215,68 +148,68 @@ test_size = st.sidebar.slider("Test size", 0.10, 0.40, 0.25, 0.05)
 random_state = st.sidebar.number_input("Random state", value=42, step=1)
 
 st.sidebar.header("Prediction")
-threshold = st.sidebar.slider("Probability threshold (if available)", 0.10, 0.90, 0.50, 0.05)
+threshold = st.sidebar.slider("Probability threshold", 0.10, 0.90, 0.50, 0.05)
 
 st.sidebar.header("Display")
-show_data = st.sidebar.checkbox("Show dataset preview", value=True)
-show_distributions = st.sidebar.checkbox("Show target distributions", value=True)
+
+# Light version: comparison uses SAVED models (no training)
+show_compare = st.sidebar.checkbox("Generate comparison table (fast - uses saved models)", value=True)
 
 run_btn = st.sidebar.button("🚀 Run / Re-run")
 
 
-# ---------------- Load data ----------------
-@st.cache_data
-def load_data():
-    return pd.read_csv("ObesityDataSet.csv")
+# ---------------- Paths ----------------
+# Obesity_Streamlit_App/model/
+# models are saved inside: Obesity_Streamlit_App/model/models/
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "model", "ObesityDataSet.csv")
 
-
-df = load_data()
-target_col = "NObeyesdad"
-
-
-# ---------------- Preview ----------------
-if show_data:
-    card("Dataset Preview", "First few rows of the dataset.", "card-blue")
-    st.dataframe(df.head(10), width="stretch")
-
-    csv_data = df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️ Download Full Dataset (CSV)",
-        data=csv_data,
-        file_name="ObesityDataSet.csv",
-        mime="text/csv"
-    )
-
-
-# ---------------- Target mapping ----------------
-target_map = {
-    "Insufficient_Weight": 0,
-    "Normal_Weight": 0,
-    "Overweight_Level_I": 1,
-    "Overweight_Level_II": 1,
-    "Obesity_Type_I": 1,
-    "Obesity_Type_II": 1,
-    "Obesity_Type_III": 1,
+MODEL_PATHS = {
+    "Logistic Regression": os.path.join(BASE_DIR, "model", "models", "logistic_regression.pkl"),
+    "Decision Tree": os.path.join(BASE_DIR, "model", "models", "decision_tree.pkl"),
+    "KNN": os.path.join(BASE_DIR, "model", "models", "knn.pkl"),
+    "Naive Bayes (GaussianNB)": os.path.join(BASE_DIR, "model", "models", "naive_bayes.pkl"),
+    "Random Forest": os.path.join(BASE_DIR, "model", "models", "random_forest.pkl"),
+    "XGBoost": os.path.join(BASE_DIR, "model", "models", "xgboost.pkl"),
 }
 
-y = df[target_col].map(target_map).fillna(0).astype(int)
+
+# ---------------- Load data ----------------
+@st.cache_data
+def load_data(csv_path: str) -> pd.DataFrame:
+    return pd.read_csv(csv_path)
 
 
-# ---------------- Distributions ----------------
-if show_distributions:
-    card("Target Distributions", "Class balance overview.", "card-amber")
-    with st.expander("Target distributions"):
-        st.write(df[target_col].value_counts())
-        st.write(y.value_counts())
+@st.cache_resource
+def load_model(model_path: str):
+    return joblib.load(model_path)
 
 
-# ---------------- Features ----------------
-binary_cols = ["family_history_with_overweight", "FAVC", "SMOKE", "SCC"]
-for col in binary_cols:
-    if col in df.columns:
-        df[col] = df[col].astype(str).str.lower().map({"yes": 1, "no": 0}).fillna(0)
+df = load_data(CSV_PATH)
+X, y = prepare_X_y(df)
 
-X = pd.get_dummies(df.drop(columns=[target_col]), drop_first=True)
+
+# ---------------- Dataset Preview (Always Visible) ----------------
+card("Dataset Preview", "First few rows of the dataset.", "card-blue")
+
+st.dataframe(df.head(10), width="stretch")
+
+csv_data = df.to_csv(index=False).encode("utf-8")
+st.download_button(
+    label="Download Full Dataset (CSV)",
+    data=csv_data,
+    file_name="ObesityDataSet.csv",
+    mime="text/csv"
+)
+
+
+
+# ---------------- Target Distributions (Always Visible) ----------------
+card("Target Distributions", "Class balance overview.", "card-amber")
+
+with st.expander("Target distributions", expanded=True):
+    st.write(df["NObeyesdad"].value_counts())
+    st.write(y.value_counts())
 
 
 if not run_btn:
@@ -284,133 +217,42 @@ if not run_btn:
     st.stop()
 
 
-def generate_readme_table(X_train_df, X_test_df, y_train, y_test, random_state):
-    """
-    Uses the SAME train/test split as the selected model section.
-    Applies scaling ONLY for LR and KNN inside this function.
-    Uses threshold=0.50 for fair comparison across models.
-    """
-    rows = []
-
-    models = {
-        "Logistic Regression": LogisticRegression(max_iter=2000),
-        "Decision Tree": DecisionTreeClassifier(random_state=random_state),
-        "KNN": KNeighborsClassifier(),
-        "Naive Bayes": GaussianNB(),
-        "Random Forest": RandomForestClassifier(random_state=random_state, n_jobs=-1),
-    }
-
-    if XGB_AVAILABLE:
-        models["XGBoost"] = XGBClassifier(
-            n_estimators=100,
-            max_depth=4,
-            learning_rate=0.1,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            eval_metric="logloss",
-            random_state=random_state,
-            n_jobs=-1
-        )
-
-    for name, model in models.items():
-        if name in ["Logistic Regression", "KNN"]:
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train_df)
-            X_test = scaler.transform(X_test_df)
-        else:
-            X_train = X_train_df
-            X_test = X_test_df
-
-        model.fit(X_train, y_train)
-
-        if hasattr(model, "predict_proba"):
-            y_prob = model.predict_proba(X_test)[:, 1]
-            y_pred = (y_prob >= 0.50).astype(int)
-            auc = roc_auc_score(y_test, y_prob)
-        else:
-            y_pred = model.predict(X_test)
-            auc = np.nan
-
-        acc = accuracy_score(y_test, y_pred)
-        mcc = matthews_corrcoef(y_test, y_pred)
-
-        report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
-        precision = report["weighted avg"]["precision"]
-        recall = report["weighted avg"]["recall"]
-        f1 = report["weighted avg"]["f1-score"]
-
-        rows.append([name, acc, auc, mcc, precision, recall, f1])
-
-    df_results = pd.DataFrame(
-        rows,
-        columns=["Model", "Accuracy", "AUC", "MCC", "Precision", "Recall", "F1"]
-    ).sort_values(by=["Accuracy", "AUC", "MCC"], ascending=False).reset_index(drop=True)
-
-    # Start index from 1 instead of 0
-    df_results.index = df_results.index + 1
-
-    return df_results
-
-
-# ---------------- Train/Test split (keep DF copies) ----------------
-X_train_df, X_test_df, y_train, y_test = train_test_split(
-    X, y, test_size=test_size, random_state=random_state, stratify=y
+# ---------------- Train/Test split (ONLY for evaluation) ----------------
+_, X_test_df, _, y_test = train_test_split(
+    X, y, test_size=float(test_size), random_state=int(random_state), stratify=y
 )
 
-# Selected model training data (may be scaled)
-X_train, X_test = X_train_df, X_test_df
 
-needs_scaling = model_name in ["Logistic Regression", "KNN"]
-if needs_scaling:
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train_df)
-    X_test = scaler.transform(X_test_df)
+# ---------------- Load Selected Model (NO TRAINING) ----------------
+model_path = MODEL_PATHS.get(model_name)
 
-
-# ---------------- Model ----------------
-if model_name == "Logistic Regression":
-    model = LogisticRegression(max_iter=2000)
-elif model_name == "Decision Tree":
-    model = DecisionTreeClassifier(random_state=random_state)
-elif model_name == "KNN":
-    model = KNeighborsClassifier()
-elif model_name == "Naive Bayes (GaussianNB)":
-    model = GaussianNB()
-elif model_name == "Random Forest":
-    model = RandomForestClassifier(random_state=random_state, n_jobs=-1)
-elif model_name == "XGBoost (optional)":
-    if not XGB_AVAILABLE:
-        st.error("XGBoost is not available in this environment. Please check requirements.txt and redeploy.")
-        st.stop()
-
-    model = XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        eval_metric="logloss",
-        random_state=random_state,
-        n_jobs=-1
-    )
-else:
-    st.error("Unknown model selection")
+if not model_path or not os.path.exists(model_path):
+    st.error(f"Model file not found: {model_path}")
+    st.info("Run `python model/train_all_models.py` locally to generate .pkl files.")
     st.stop()
 
-model.fit(X_train, y_train)
+# Safe model loading
+try:
+    model = load_model(model_path)
+except Exception as e:
+    st.error(f"Failed to load selected model ({model_name}): {e}")
+    st.stop()
 
-
-# ---------------- Predict ----------------
-y_prob = None
-if hasattr(model, "predict_proba"):
-    y_prob = model.predict_proba(X_test)[:, 1]
-    y_pred = (y_prob >= threshold).astype(int)
-else:
-    y_pred = model.predict(X_test)
+# Safe prediction
+try:
+    y_prob = None
+    if hasattr(model, "predict_proba"):
+        y_prob = model.predict_proba(X_test_df)[:, 1]
+        y_pred = (y_prob >= float(threshold)).astype(int)
+    else:
+        y_pred = model.predict(X_test_df)
+except Exception as e:
+    st.error(f"Failed to run prediction for selected model ({model_name}): {e}")
+    st.stop()
 
 
 # ---------------- Metrics ----------------
-card("Model Performance", "Evaluation metrics.", "card-purple")
+card("Model Performance", "Evaluation metrics (model is loaded from .pkl, no training here).", "card-purple")
 
 acc = accuracy_score(y_test, y_pred)
 st.metric("Overall Accuracy", round(acc, 4))
@@ -425,13 +267,14 @@ mcc = matthews_corrcoef(y_test, y_pred)
 col2.metric("MCC", round(mcc, 4))
 
 report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
-
 report_df = pd.DataFrame(report).T.round(4)
+# Remove duplicate accuracy row (if already shown)
+if "accuracy" in report_df.index:
+    report_df = report_df.drop(index="accuracy")
 report_df = report_df.rename(index={
     "0": "Class 0 – Not Obese",
     "1": "Class 1 – Obese"
 })
-
 st.table(report_df)
 
 
@@ -446,8 +289,67 @@ st.table(
 )
 
 
-# ---------------- Models performance comparison table ----------------
+# ---------------- Comparison Table (uses saved models) ----------------
+def safe_predict(model_loaded, X_test_df, threshold):
+    """Return (y_pred, y_prob or None) safely."""
+    if hasattr(model_loaded, "predict_proba"):
+        prob = model_loaded.predict_proba(X_test_df)[:, 1]
+        pred = (prob >= threshold).astype(int)
+        return pred, prob
+    pred = model_loaded.predict(X_test_df)
+    return pred, None
+
+def compute_saved_models_comparison(X_test_df, y_test, threshold: float):
+    rows = []
+
+    for name, path in MODEL_PATHS.items():
+        if not os.path.exists(path):
+            continue
+
+        try:
+            m = load_model(path)
+            # fixed 0.5 for fair comparison across models
+            y_pred_i, y_prob_i = safe_predict(m, X_test_df, threshold=0.5)
+
+            acc_i = accuracy_score(y_test, y_pred_i)
+            mcc_i = matthews_corrcoef(y_test, y_pred_i)
+            auc_i = roc_auc_score(y_test, y_prob_i) if y_prob_i is not None else np.nan
+
+            rep = classification_report(y_test, y_pred_i, output_dict=True, zero_division=0)
+
+            rows.append([
+                name,
+                acc_i,
+                auc_i,
+                mcc_i,
+                rep["weighted avg"]["precision"],
+                rep["weighted avg"]["recall"],
+                rep["weighted avg"]["f1-score"],
+            ])
+
+        except Exception as e:
+            st.warning(f"Skipped {name}: {e}")
+            continue
+
+    df_results = pd.DataFrame(
+        rows,
+        columns=["Model", "Accuracy", "AUC", "MCC", "Precision", "Recall", "F1"]
+    ).sort_values(by=["Accuracy", "AUC", "MCC"], ascending=False).reset_index(drop=True)
+
+    df_results.index = df_results.index + 1
+    return df_results
+
+
 st.subheader("Models performance Comparison")
 
-results_df = generate_readme_table(X_train_df, X_test_df, y_train, y_test, random_state)
-st.table(results_df.round(4))
+if show_compare:
+    results_df = compute_saved_models_comparison(X_test_df, y_test, float(threshold))
+
+    st.dataframe(
+        results_df.round(4),
+        width="stretch",
+        hide_index=True
+    )
+else:
+    st.info("Enable comparison to display results.")
+
