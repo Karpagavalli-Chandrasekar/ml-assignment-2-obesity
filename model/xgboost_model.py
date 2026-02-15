@@ -20,7 +20,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, roc_auc_score, matthews_corrcoef
 
-from preprocess import prepare_X_y
+from model.preprocess import prepare_X_y
 
 # Optional import: keep project working even if xgboost is not installed
 try:
@@ -30,7 +30,9 @@ except Exception:
     XGB_AVAILABLE = False
     XGBClassifier = None  # type: ignore
 
-CSV_FILE = "ObesityDataSet.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "ObesityDataSet.csv")
+
 RANDOM_STATE = 42
 TEST_SIZE = 0.20
 
@@ -125,8 +127,8 @@ def main() -> None:
         return
 
     df = pd.read_csv(CSV_FILE)
-    train_and_save(df, out_path="models/xgboost.pkl", verbose=True)
-
+    out_path = os.path.join(BASE_DIR, "models", "xgboost.pkl")
+    train_and_save(df, out_path=out_path, verbose=True)
 
 if __name__ == "__main__":
     main()

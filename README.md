@@ -61,14 +61,20 @@ XGBoost achieved the highest performance across all evaluation metrics. It showe
 
 
 ## Live App: 
-https://obesity-classification-app.streamlit.app/
+https://obesitylevel-analysis.streamlit.app/
 ---
 
 ## How to Run the Project
 
 ### Run Individual Model
 ```
-python model/logistic_regression.py
+python -m model.logistic_regression
+python -m model.decision_tree
+python -m model.knn
+python -m model.naive_bayes
+python -m model.random_forest
+python -m model.xgboost_model
+
 ```
 
 ### Run Streamlit App

@@ -18,11 +18,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score, matthews_corrcoef
 
-from preprocess import prepare_X_y
+from model.preprocess import prepare_X_y  # <-- use package import
 
-CSV_FILE = "ObesityDataSet.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "ObesityDataSet.csv")  # <-- correct path
 RANDOM_STATE = 42
 TEST_SIZE = 0.20
+
 
 
 def build_model(max_iter: int = 2000) -> Pipeline:
@@ -65,10 +67,11 @@ def train_and_save(
     return out_path
 
 
-def main() -> None:
-    np.random.seed(RANDOM_STATE)
+def main():
     df = pd.read_csv(CSV_FILE)
-    train_and_save(df, out_path="models/logistic_regression.pkl", verbose=True)
+
+    out_path = os.path.join(BASE_DIR, "models", "model_name.pkl")
+    train_and_save(df, out_path=out_path)
 
 
 if __name__ == "__main__":

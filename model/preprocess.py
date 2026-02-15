@@ -47,3 +47,30 @@ def prepare_X_y(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     X = pd.get_dummies(X, columns=multi_cols, drop_first=True)
 
     return X.astype(float), y
+
+
+def prepare_X(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preprocess features only (used for prediction mode when no target column exists).
+    Must match exactly the transformations done inside prepare_X_y.
+    """
+
+    df2 = df.copy()
+
+    # yes/no -> 1/0
+    binary_cols = ["family_history_with_overweight", "FAVC", "SMOKE", "SCC"]
+    for col in binary_cols:
+        if col in df2.columns:
+            df2[col] = (
+                df2[col].astype(str).str.strip().str.lower()
+                .map({"yes": 1, "no": 0})
+                .fillna(0).astype(int)
+            )
+
+    # One-hot encoding
+    multi_cols = ["Gender", "CAEC", "CALC", "MTRANS"]
+    multi_cols = [c for c in multi_cols if c in df2.columns]
+    df2 = pd.get_dummies(df2, columns=multi_cols, drop_first=True)
+
+    return df2.astype(float)
+

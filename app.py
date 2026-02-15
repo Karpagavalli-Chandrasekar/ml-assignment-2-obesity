@@ -76,6 +76,11 @@ def apply_theme():
             background-color: rgba(15, 23, 42, 0.70) !important;
         }
 
+        div[data-testid="stFileUploader"] {
+            background: rgba(255,255,255,0.15) !important;
+            border-radius: 10px !important;
+        }
+
         div[role="listbox"] {
             background: rgba(15, 23, 42, 0.95) !important;
             color: #ffffff !important;
@@ -103,6 +108,29 @@ def apply_theme():
         div[data-testid="stDownloadButton"] button svg { fill: #000000 !important; }
 
         .stTable, .stDataFrame { background: rgba(15, 23, 42, 0.55) !important; }
+
+/* ===== File Uploader Styling ===== */
+
+div[data-testid="stFileUploader"] {
+    background: rgba(255,255,255,0.15) !important;
+    border-radius: 12px !important;
+    padding: 10px !important;
+}
+
+/* Browse files button */
+div[data-testid="stFileUploader"] button {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    border: 1px solid #000000 !important;
+    border-radius: 8px !important;
+}
+
+/* Text inside button */
+div[data-testid="stFileUploader"] button * {
+    color: #000000 !important;
+}
+
         </style>
         """,
         unsafe_allow_html=True
@@ -157,6 +185,12 @@ show_compare = st.sidebar.checkbox("Generate comparison table (fast - uses saved
 
 run_btn = st.sidebar.button("🚀 Run / Re-run")
 
+st.sidebar.header("Test CSV Upload")
+uploaded_test_file = st.sidebar.file_uploader(
+    "⬆️ Upload Test CSV (features only – no NObeyesdad)",
+    type=["csv"]
+)
+
 
 # ---------------- Paths ----------------
 # Obesity_Streamlit_App/model/
@@ -188,6 +222,32 @@ def load_model(model_path: str):
 df = load_data(CSV_PATH)
 X, y = prepare_X_y(df)
 
+# ---------------- Test CSV Download (Without Target) ----------------
+# Create test split based on sidebar settings
+_, X_test_tmp, _, y_test_tmp = train_test_split(
+    X,
+    y,
+    test_size=float(test_size),
+    random_state=int(random_state),
+    stratify=y
+)
+
+# Recover original raw rows using index
+test_raw = df.loc[X_test_tmp.index].copy()
+
+# Remove target column
+test_features_only = test_raw.drop(columns=["NObeyesdad"], errors="ignore")
+
+# Convert to CSV bytes
+test_csv_bytes = test_features_only.to_csv(index=False).encode("utf-8")
+
+st.sidebar.download_button(
+    label="⬇️ Download Test CSV (features only)",
+    data=test_csv_bytes,
+    file_name="Obesity_Test_features_only.csv",
+    mime="text/csv"
+)
+
 
 # ---------------- Dataset Preview (Always Visible) ----------------
 card("Dataset Preview", "First few rows of the dataset.", "card-blue")
@@ -196,7 +256,7 @@ st.dataframe(df.head(10), width="stretch")
 
 csv_data = df.to_csv(index=False).encode("utf-8")
 st.download_button(
-    label="Download Full Dataset (CSV)",
+    label="⬇️ Download Full Dataset (CSV)",
     data=csv_data,
     file_name="ObesityDataSet.csv",
     mime="text/csv"
@@ -216,11 +276,31 @@ if not run_btn:
     card("Ready to Run", "Choose options on the left and click Run.", "card-green")
     st.stop()
 
+# ---------------- Test data for evaluation: Upload overrides internal split ----------------
+if uploaded_test_file is not None:
+    try:
+        uploaded_df = pd.read_csv(uploaded_test_file)
+    except Exception as e:
+        st.error(f"Failed to read uploaded CSV: {e}")
+        st.stop()
 
-# ---------------- Train/Test split (ONLY for evaluation) ----------------
-_, X_test_df, _, y_test = train_test_split(
-    X, y, test_size=float(test_size), random_state=int(random_state), stratify=y
-)
+    if "NObeyesdad" in uploaded_df.columns:
+        st.error("Uploaded test CSV should NOT contain target column.")
+        st.stop()
+
+    # Prepare features only
+    from model.preprocess import prepare_X
+    X_test_df = prepare_X(uploaded_df)
+
+    card("Using Uploaded Test CSV", "Prediction mode (no target column).", "card-green")
+    y_test = None
+    prediction_only = True
+else:
+    _, X_test_df, _, y_test = train_test_split(
+        X, y, test_size=float(test_size), random_state=int(random_state), stratify=y
+    )
+    prediction_only = False
+
 
 
 # ---------------- Load Selected Model (NO TRAINING) ----------------
@@ -241,14 +321,45 @@ except Exception as e:
 # Safe prediction
 try:
     y_prob = None
+
     if hasattr(model, "predict_proba"):
-        y_prob = model.predict_proba(X_test_df)[:, 1]
-        y_pred = (y_prob >= float(threshold)).astype(int)
+        proba = model.predict_proba(X_test_df)
+
+        # Binary case
+        if proba.shape[1] == 2:
+            y_prob = proba[:, 1]
+            y_pred = (y_prob >= float(threshold)).astype(int)
+
+        # Multi-class case
+        else:
+            y_pred = np.argmax(proba, axis=1)
     else:
         y_pred = model.predict(X_test_df)
+
 except Exception as e:
     st.error(f"Failed to run prediction for selected model ({model_name}): {e}")
     st.stop()
+
+# ---------------- Prediction Only Mode ----------------
+if prediction_only:
+    output_df = uploaded_df.copy()
+    output_df["Predicted_Class"] = y_pred
+
+    if y_prob is not None:
+        output_df["Predicted_Prob_Obese"] = y_prob
+
+    st.subheader("Predictions")
+    st.dataframe(output_df.head(30), width="stretch")
+
+    st.download_button(
+        "Download Predictions",
+        data=output_df.to_csv(index=False).encode("utf-8"),
+        file_name="predictions.csv",
+        mime="text/csv"
+    )
+
+    st.stop()   # Much needed
+
 
 
 # ---------------- Metrics ----------------

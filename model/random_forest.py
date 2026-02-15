@@ -20,9 +20,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, matthews_corrcoef
 
-from preprocess import prepare_X_y
+from model.preprocess import prepare_X_y
+import os
 
-CSV_FILE = "ObesityDataSet.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "ObesityDataSet.csv")
+
 RANDOM_STATE = 42
 TEST_SIZE = 0.20
 
@@ -91,11 +94,11 @@ def train_and_save(
     return out_path
 
 
-def main() -> None:
-    """Optional: run as standalone script (local training only)."""
-    np.random.seed(RANDOM_STATE)
+def main():
     df = pd.read_csv(CSV_FILE)
-    train_and_save(df, out_path="models/random_forest.pkl", verbose=True)
+
+    out_path = os.path.join(BASE_DIR, "models", "model_name.pkl")
+    train_and_save(df, out_path=out_path)
 
 
 if __name__ == "__main__":
